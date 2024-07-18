@@ -1,0 +1,10 @@
+BasedOnStyle: LLVM
+
+AllowShortFunctionsOnASingleLine: None
+AlwaysBreakTemplateDeclarations: Yes
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeBraces: Allman
+ColumnLimit: 100
+IndentWidth: 4
+PackConstructorInitializers: Never

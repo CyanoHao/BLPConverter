@@ -1,13 +1,51 @@
-#include "blp.h"
-#include <SimpleOpt.h>
-#include <FreeImage.h>
-#include <memory.h>
 #include <iostream>
+#include <memory.h>
+#include <memory>
+#include <stdio.h>
 #include <string>
 
+#include <FreeImage.h>
+#include <SimpleOpt.h>
+#include <fmt/core.h>
+
+#include "blp.h"
 
 using namespace std;
+using blp::Header;
+using blp::Pixel;
 
+struct FILE_ptr : public std::unique_ptr<FILE, int (*)(FILE *)>
+{
+    FILE_ptr(const char *filename, const char *mode)
+        : std::unique_ptr<FILE, int (*)(FILE *)>(fopen(filename, mode), &fclose)
+    {
+    }
+
+    operator FILE *() const
+    {
+        return get();
+    }
+};
+
+struct FIBITMAP_ptr : public std::unique_ptr<FIBITMAP, void (*)(FIBITMAP *)>
+{
+    FIBITMAP_ptr(int width,
+                 int height,
+                 int bpp,
+                 unsigned red_mask = 0,
+                 unsigned green_mask = 0,
+                 unsigned blue_mask = 0)
+        : std::unique_ptr<FIBITMAP, void (*)(FIBITMAP *)>(
+              FreeImage_Allocate(width, height, bpp, red_mask, green_mask, blue_mask),
+              &FreeImage_Unload)
+    {
+    }
+
+    operator FIBITMAP *() const
+    {
+        return get();
+    }
+};
 
 /**************************** COMMAND-LINE PARSING ****************************/
 
@@ -55,18 +93,19 @@ void showUsage(const std::string& strApplicationName)
          << endl;
 }
 
-
-void showInfos(const std::string& strFileName, tBLPInfos blpInfos)
+void showInfos(const std::string &strFilename, const Header &header)
 {
-    cout << endl
-         << "Infos about '" << strFileName << "':" << endl
-         << "  - Version:    BLP" << (int) blp_version(blpInfos) << endl
-         << "  - Format:     " << blp_asString(blp_format(blpInfos)) << endl
-         << "  - Dimensions: " << blp_width(blpInfos) << "x" << blp_height(blpInfos) << endl
-         << "  - Mip levels: " << blp_nbMipLevels(blpInfos) << endl
-         << endl;
+    fmt::print("Infos about `{}`:\n"
+               "  - Version:    BLP2\n"
+               "  - Format:     {}\n"
+               "  - Dimensions: {}x{}\n"
+               "  - Mip levels: {}\n",
+               strFilename,
+               header.friendlyFormat(),
+               header.width(),
+               header.height(),
+               header.mipLevels());
 }
-
 
 int main(int argc, char** argv)
 {
@@ -141,74 +180,64 @@ int main(int argc, char** argv)
         if (offset != string::npos)
             strOutFileName = strOutFileName.substr(offset + 1);
 
-        FILE* pFile = fopen(strInFileName.c_str(), "rb");
+        FILE_ptr pFile(strInFileName.c_str(), "rb");
         if (!pFile)
         {
             cerr << "Failed to open the file '" << strInFileName << "'" << endl;
             continue;
         }
-
-        tBLPInfos blpInfos = blp_processFile(pFile);
-        if (!blpInfos)
+        string data;
         {
-            cerr << "Failed to process the file '" << strInFileName << "'" << endl;
-            fclose(pFile);
-            continue;
+            fseek(pFile, 0, SEEK_END);
+            size_t size = ftell(pFile);
+            data.resize(size);
+            fseek(pFile, 0, SEEK_SET);
+            fread(data.data(), 1, size, pFile);
         }
 
-        if (!bInfos)
+        try
         {
-            tBGRAPixel* pData = blp_convert(pFile, blpInfos, mipLevel);
-            if (pData)
+            Header header = Header::fromBinary(data);
+
+            uint32_t width = header.width(mipLevel);
+            uint32_t height = header.height(mipLevel);
+
+            if (bInfos)
             {
-                unsigned int width = blp_width(blpInfos, mipLevel);
-                unsigned int height = blp_height(blpInfos, mipLevel);
-
-                FIBITMAP* pImage = FreeImage_Allocate(width, height, 32, 0x000000FF, 0x0000FF00, 0x00FF0000);
-                if (pImage)
-                {
-                    tBGRAPixel* pSrc = pData + (height - 1) * width;
-
-                    for (unsigned int y = 0; y < height; ++y)
-                    {
-                        BYTE* pLine = FreeImage_GetScanLine(pImage, y);
-                        memcpy(pLine, pSrc, width * sizeof(tBGRAPixel));
-
-                        pSrc -= width;
-                    }
-
-                    if (FreeImage_Save((strFormat == "tga" ? FIF_TARGA : FIF_PNG), pImage, (strOutputFolder + strOutFileName).c_str(), 0))
-                    {
-                        cerr << strInFileName << ": OK" << endl;
-                        ++nbImagesConverted;
-                    }
-                    else
-                    {
-                        cerr << strInFileName << ": Failed to save the image" << endl;
-                    }
-
-                    FreeImage_Unload(pImage);
-                }
-                else
-                {
-                    cerr << strInFileName << ": Failed to allocate memory" << endl;
-                }
-
-                delete[] pData;
+                showInfos(args.File(i), header);
             }
             else
             {
-                cerr << strInFileName << ": Unsupported format" << endl;
+                auto mipmap = header.getMipmap(data);
+
+                FIBITMAP_ptr pImage(width, height, 32, 0x000000FF, 0x0000FF00, 0x00FF0000);
+
+                for (uint32_t y = 0; y < height; ++y)
+                {
+                    Pixel *data = mipmap.data() + width * (height - y - 1);
+                    BYTE *pLine = FreeImage_GetScanLine(pImage, y);
+                    memcpy(pLine, data, width * sizeof(Pixel));
+                }
+
+                if (FreeImage_Save((strFormat == "tga" ? FIF_TARGA : FIF_PNG),
+                                   pImage,
+                                   (strOutputFolder + strOutFileName).c_str(),
+                                   0))
+                {
+                    cerr << strInFileName << ": OK" << endl;
+                    ++nbImagesConverted;
+                }
+                else
+                {
+                    cerr << strInFileName << ": Failed to save the image" << endl;
+                }
             }
         }
-        else
+        catch (const blp::BLPError &e)
         {
-            showInfos(args.File(i), blpInfos);
+            fmt::println("Failed to parse file `{}`: {}", strInFileName, e.what());
+            continue;
         }
-
-        fclose(pFile);
-
-        blp_release(blpInfos);
     }
 
     // Cleanup
