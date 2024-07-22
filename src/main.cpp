@@ -1,23 +1,23 @@
-#include <iostream>
 #include <memory.h>
 #include <memory>
-#include <stdio.h>
 #include <string>
 
 #include <FreeImage.h>
 #include <SimpleOpt.h>
 #include <fmt/core.h>
+#include <nowide/args.hpp>
+#include <nowide/cstdio.hpp>
 
 #include "blp.h"
 
-using namespace std;
 using blp::Header;
 using blp::Pixel;
+using std::string;
 
 struct FILE_ptr : public std::unique_ptr<FILE, int (*)(FILE *)>
 {
-    FILE_ptr(const char *filename, const char *mode)
-        : std::unique_ptr<FILE, int (*)(FILE *)>(fopen(filename, mode), &fclose)
+    FILE_ptr(const char *u8Filename, const char *mode)
+        : std::unique_ptr<FILE, int (*)(FILE *)>(nowide::fopen(u8Filename, mode), &fclose)
     {
     }
 
@@ -78,29 +78,31 @@ const CSimpleOpt::SOption COMMAND_LINE_OPTIONS[] = {
 
 /********************************** FUNCTIONS *********************************/
 
-void showUsage(const std::string& strApplicationName)
+void showUsage(const std::string &u8ApplicationName)
 {
-    cout << "BLPConverter" << endl
-         << endl
-         << "Usage: " << strApplicationName << " [options] <blp_filename> [<blp_filename> ... <blp_filename>]" << endl
-         << endl
-         << "Options:" << endl
-         << "  --help, -h:      Display this help" << endl
-         << "  --infos, -i:     Display informations about the BLP file(s) (no conversion)" << endl
-         << "  --dest, -o:      Folder where the converted image(s) must be written to (default: './')" << endl
-         << "  --format, -f:    'png' or 'tga' (default: png)" << endl
-         << "  --miplevel, -m:  The specific mip level to convert (default: 0, the bigger one)" << endl
-         << endl;
+    fmt::print("BLPConverter\n"
+               "\n"
+               "Usage: {} [options] <blp_filename> [<blp_filename> ... <blp_filename>]\n"
+               "\n"
+               "Options:\n"
+               "  --help, -h:      Display this help\n"
+               "  --infos, -i:     Display informations about the BLP file(s) (no conversion)\n"
+               "  --dest, -o:      Folder where the converted image(s) must be written to "
+               "(default: './')\n"
+               "  --format, -f:    'png' or 'tga' (default: png)\n"
+               "  --miplevel, -m:  The specific mip level to convert (default: 0, the bigger one)\n"
+               "\n",
+               u8ApplicationName);
 }
 
-void showInfos(const std::string &strFilename, const Header &header)
+void showInfos(const std::string &u8Filename, const Header &header)
 {
     fmt::print("Infos about `{}`:\n"
                "  - Version:    BLP2\n"
                "  - Format:     {}\n"
                "  - Dimensions: {}x{}\n"
                "  - Mip levels: {}\n",
-               strFilename,
+               u8Filename,
                header.friendlyFormat(),
                header.width(),
                header.height(),
@@ -109,8 +111,10 @@ void showInfos(const std::string &strFilename, const Header &header)
 
 int main(int argc, char** argv)
 {
+    nowide::args _(argc, argv);
+
     bool         bInfos             = false;
-    string       strOutputFolder    = "./";
+    string       u8OutputFolder    = "./";
     string       strFormat          = "png";
     unsigned int mipLevel           = 0;
     unsigned int nbImagesTotal      = 0;
@@ -134,9 +138,9 @@ int main(int argc, char** argv)
                     break;
 
                 case OPT_DEST:
-                    strOutputFolder = args.OptionArg();
-                    if (strOutputFolder.at(strOutputFolder.size() - 1) != '/')
-                        strOutputFolder += "/";
+                    u8OutputFolder = args.OptionArg();
+                    if (u8OutputFolder.at(u8OutputFolder.size() - 1) != '/')
+                        u8OutputFolder += "/";
                     break;
 
                 case OPT_FORMAT:
@@ -152,14 +156,14 @@ int main(int argc, char** argv)
         }
         else
         {
-            cerr << "Invalid argument: " << args.OptionText() << endl;
+            fmt::println("Invalid argument: `{}`", args.OptionText());
             return -1;
         }
     }
 
     if (args.FileCount() == 0)
     {
-        cerr << "No BLP file specified" << endl;
+        puts("No BLP file specified\n");
         return -1;
     }
 
@@ -173,17 +177,17 @@ int main(int argc, char** argv)
     {
         ++nbImagesTotal;
 
-        string strInFileName = args.File(i);
-        string strOutFileName = strInFileName.substr(0, strInFileName.size() - 3) + strFormat;
+        string u8InFileName = args.File(i);
+        string u8OutFileName = u8InFileName.substr(0, u8InFileName.size() - 3) + strFormat;
 
-        size_t offset = strOutFileName.find_last_of("/\\");
+        size_t offset = u8OutFileName.find_last_of("/\\");
         if (offset != string::npos)
-            strOutFileName = strOutFileName.substr(offset + 1);
+            u8OutFileName = u8OutFileName.substr(offset + 1);
 
-        FILE_ptr pFile(strInFileName.c_str(), "rb");
+        FILE_ptr pFile(u8InFileName.c_str(), "rb");
         if (!pFile)
         {
-            cerr << "Failed to open the file '" << strInFileName << "'" << endl;
+            fmt::println(stderr, "Failed to open the file `{}`", u8InFileName);
             continue;
         }
         string data;
@@ -221,21 +225,21 @@ int main(int argc, char** argv)
 
                 if (FreeImage_Save((strFormat == "tga" ? FIF_TARGA : FIF_PNG),
                                    pImage,
-                                   (strOutputFolder + strOutFileName).c_str(),
+                                   (u8OutputFolder + u8OutFileName).c_str(),
                                    0))
                 {
-                    cerr << strInFileName << ": OK" << endl;
+                    fmt::println(stderr, "{}: OK", u8InFileName);
                     ++nbImagesConverted;
                 }
                 else
                 {
-                    cerr << strInFileName << ": Failed to save the image" << endl;
+                    fmt::println(stderr, "{}: Failed to save the image", u8InFileName);
                 }
             }
         }
         catch (const blp::BLPError &e)
         {
-            fmt::println("Failed to parse file `{}`: {}", strInFileName, e.what());
+            fmt::println(stderr, "Failed to parse file `{}`: {}", u8InFileName, e.what());
             continue;
         }
     }
