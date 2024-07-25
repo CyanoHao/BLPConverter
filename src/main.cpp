@@ -5,12 +5,13 @@
 #include <vector>
 
 #include <CLI/CLI.hpp>
-#include <FreeImage.h>
 #include <fmt/core.h>
 #include <nowide/args.hpp>
 #include <nowide/cstdio.hpp>
 
 #include "blp.h"
+
+#include "FIfix.h"
 
 using blp::Header;
 using blp::Pixel;
@@ -25,26 +26,6 @@ struct FILE_ptr : public std::unique_ptr<FILE, int (*)(FILE *)>
     }
 
     operator FILE *() const
-    {
-        return get();
-    }
-};
-
-struct FIBITMAP_ptr : public std::unique_ptr<FIBITMAP, void (*)(FIBITMAP *)>
-{
-    FIBITMAP_ptr(int width,
-                 int height,
-                 int bpp,
-                 unsigned red_mask = 0,
-                 unsigned green_mask = 0,
-                 unsigned blue_mask = 0)
-        : std::unique_ptr<FIBITMAP, void (*)(FIBITMAP *)>(
-              FreeImage_Allocate(width, height, bpp, red_mask, green_mask, blue_mask),
-              &FreeImage_Unload)
-    {
-    }
-
-    operator FIBITMAP *() const
     {
         return get();
     }
@@ -93,8 +74,7 @@ int main(int argc, char **argv)
 
     unsigned int nbImagesConverted = 0;
 
-    // Initialise FreeImage
-    FreeImage_Initialise(true);
+    freeimage::Initialise(true);
 
     // Process the files
     for (auto &u8InFileName : filenames)
@@ -140,14 +120,15 @@ int main(int argc, char **argv)
                 for (uint32_t y = 0; y < height; ++y)
                 {
                     Pixel *data = mipmap.data() + width * (height - y - 1);
-                    BYTE *pLine = FreeImage_GetScanLine(pImage, y);
+                    uint8_t *pLine = freeimage::GetScanLine(pImage, y);
                     memcpy(pLine, data, width * sizeof(Pixel));
                 }
 
-                if (FreeImage_Save((strFormat == "tga" ? FIF_TARGA : FIF_PNG),
-                                   pImage,
-                                   (u8OutputFolder + u8OutFileName).c_str(),
-                                   0))
+                if (freeimage::Save(
+                        (strFormat == "tga" ? freeimage::Format::TARGA : freeimage::Format::PNG),
+                        pImage,
+                        (u8OutputFolder + u8OutFileName).c_str(),
+                        0))
                 {
                     fmt::println(stderr, "{}: OK", u8InFileName);
                     ++nbImagesConverted;
@@ -165,8 +146,7 @@ int main(int argc, char **argv)
         }
     }
 
-    // Cleanup
-    FreeImage_DeInitialise();
+    freeimage::DeInitialise();
 
     return 0;
 }
