@@ -30,17 +30,22 @@ The executable will be put in `dist/bin`.
 
 ## Usage
 
-(Copied from ./BLPConverter --help)
+(Copied from `./BLPConverter --help`)
 
-```
-Usage: ./BLPConverter [options] <blp_filename> [<blp_filename> ... <blp_filename>]
+```text
+Convert BLP image files to PNG or TGA format
+Usage: BLPConverter [OPTIONS] files...
+
+Positionals:
+  files TEXT ... REQUIRED     
 
 Options:
-  --help, -h:      Display this help
-  --infos, -i:     Display informations about the BLP file(s) (no conversion)
-  --dest, -o:      Folder where the converted image(s) must be written to (default: './')
-  --format, -f:    'png' or 'tga' (default: png)
-  --miplevel, -m:  The specific mip level to convert (default: 0, the bigger one)
+  -h,--help                   Print this help message and exit
+  -i,--infos                  Display informations about the BLP file(s) (no conversion)
+  -o,--dest TEXT [./]         Folder where the converted image(s) must be written to
+  -f,--format TEXT [png]      `png` or `tga`
+  -m,--miplevel UINT [0]      The specific mip level to convert
+  -j,--jobs UINT [...]        Number of parallel jobs
 ```
 
 ## Extras
