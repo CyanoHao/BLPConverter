@@ -7,22 +7,17 @@ Forked from [Kanma/BLPConverter](https://github.com/Kanma/BLPConverter).
 A command-line tool to convert BLP image files to PNG or TGA format. The BLP
 images are used by Blizzard games.
 
-Supports the following BLP formats:
+Supports the following BLP2 formats:
 
-* BLP1:
-  - JPEG
-  - Uncompressed without alpha channel
-  - Uncompressed with alpha channel (8-bits)
-* BLP2:
-  - Uncompressed without alpha channel
-  - Uncompressed with alpha channel (1-, 4-, and 8-bits)
-  - Uncompressed raw BGRA (known as RAW3)
-  - DXT1 without alpha channel
-  - DXT1 with alpha channel (1-bit)
-  - DXT3 with alpha channel (4- and 8-bits)
-  - DXT5 with alpha channel (8-bit)
+- Uncompressed without alpha channel
+- Uncompressed with alpha channel (1-, 4-, and 8-bits)
+- Uncompressed raw BGRA (known as RAW3)
+- DXT1 without alpha channel
+- DXT1 with alpha channel (1-bit)
+- DXT3 with alpha channel (4- and 8-bits)
+- DXT5 with alpha channel (8-bit)
 
-Works on MacOS X and Linux.
+Works on Windows and Linux.
 
 ## Compilation
 
@@ -55,14 +50,7 @@ all the BLP files in a hierarchy of folders.
 
 ## Dependencies
 
-The repository/package contain all the necessary files, no need to install any
-other library.
-
-The following libraries are used (and are part of the distribution):
-
-- squish 1.10 (http://code.google.com/p/libsquish/), MIT License
-- FreeImage 3.13.1 (http://freeimage.sourceforge.net/), FreeImage Public License - Version 1.0
-- SimpleOpt 3.4 (http://code.jellycan.com/simpleopt/), MIT License
+Dependencies are [managed by xmake](./xmake.lua). `xmake build` will automatically download and install the dependencies.
 
 ## License
 
