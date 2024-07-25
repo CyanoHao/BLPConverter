@@ -1,9 +1,11 @@
+#include <cstdint>
 #include <memory.h>
 #include <memory>
 #include <string>
+#include <vector>
 
+#include <CLI/CLI.hpp>
 #include <FreeImage.h>
-#include <SimpleOpt.h>
 #include <fmt/core.h>
 #include <nowide/args.hpp>
 #include <nowide/cstdio.hpp>
@@ -13,6 +15,7 @@
 using blp::Header;
 using blp::Pixel;
 using std::string;
+using std::vector;
 
 struct FILE_ptr : public std::unique_ptr<FILE, int (*)(FILE *)>
 {
@@ -47,54 +50,6 @@ struct FIBITMAP_ptr : public std::unique_ptr<FIBITMAP, void (*)(FIBITMAP *)>
     }
 };
 
-/**************************** COMMAND-LINE PARSING ****************************/
-
-// The valid options
-enum
-{
-    OPT_HELP,
-    OPT_INFOS,
-    OPT_DEST,
-    OPT_FORMAT,
-    OPT_MIP_LEVEL,
-};
-
-
-const CSimpleOpt::SOption COMMAND_LINE_OPTIONS[] = {
-    { OPT_HELP,      "-h",         SO_NONE },
-    { OPT_HELP,      "--help",     SO_NONE },
-    { OPT_INFOS,     "-i",         SO_NONE },
-    { OPT_INFOS,     "--infos",    SO_NONE },
-    { OPT_DEST,      "-o",         SO_REQ_SEP },
-    { OPT_DEST,      "--dest",     SO_REQ_SEP },
-    { OPT_FORMAT,    "-f",         SO_REQ_SEP },
-    { OPT_FORMAT,    "--format",   SO_REQ_SEP },
-    { OPT_MIP_LEVEL, "-m",         SO_REQ_SEP },
-    { OPT_MIP_LEVEL, "--miplevel", SO_REQ_SEP },
-
-    SO_END_OF_OPTIONS
-};
-
-
-/********************************** FUNCTIONS *********************************/
-
-void showUsage(const std::string &u8ApplicationName)
-{
-    fmt::print("BLPConverter\n"
-               "\n"
-               "Usage: {} [options] <blp_filename> [<blp_filename> ... <blp_filename>]\n"
-               "\n"
-               "Options:\n"
-               "  --help, -h:      Display this help\n"
-               "  --infos, -i:     Display informations about the BLP file(s) (no conversion)\n"
-               "  --dest, -o:      Folder where the converted image(s) must be written to "
-               "(default: './')\n"
-               "  --format, -f:    'png' or 'tga' (default: png)\n"
-               "  --miplevel, -m:  The specific mip level to convert (default: 0, the bigger one)\n"
-               "\n",
-               u8ApplicationName);
-}
-
 void showInfos(const std::string &u8Filename, const Header &header)
 {
     fmt::print("Infos about `{}`:\n"
@@ -109,75 +64,41 @@ void showInfos(const std::string &u8Filename, const Header &header)
                header.mipLevels());
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     nowide::args _(argc, argv);
 
-    bool         bInfos             = false;
-    string       u8OutputFolder    = "./";
-    string       strFormat          = "png";
-    unsigned int mipLevel           = 0;
-    unsigned int nbImagesTotal      = 0;
-    unsigned int nbImagesConverted  = 0;
+    CLI::App app{"Convert BLP image files to PNG or TGA format", "BLPConverter"};
 
+    bool bInfos = false;
+    string u8OutputFolder = "./";
+    string strFormat = "png";
+    uint32_t mipLevel = 0;
+    vector<string> filenames;
 
-    // Parse the command-line parameters
-    CSimpleOpt args(argc, argv, COMMAND_LINE_OPTIONS);
-    while (args.Next())
-    {
-        if (args.LastError() == SO_SUCCESS)
-        {
-            switch (args.OptionId())
-            {
-                case OPT_HELP:
-                    showUsage(argv[0]);
-                    return 0;
+    app.add_flag(
+        "-i,--infos", bInfos, "Display informations about the BLP file(s) (no conversion)");
+    app.add_option(
+           "-o,--dest", u8OutputFolder, "Folder where the converted image(s) must be written to")
+        ->capture_default_str();
+    app.add_option("-f,--format", strFormat, "`png` or `tga`")->capture_default_str();
+    app.add_option("-m,--miplevel", mipLevel, "The specific mip level to convert")
+        ->capture_default_str();
+    app.add_option("files", filenames)->expected(1, -1)->required();
 
-                case OPT_INFOS:
-                    bInfos = true;
-                    break;
+    CLI11_PARSE(app, argc, argv);
 
-                case OPT_DEST:
-                    u8OutputFolder = args.OptionArg();
-                    if (u8OutputFolder.at(u8OutputFolder.size() - 1) != '/')
-                        u8OutputFolder += "/";
-                    break;
+    if (!u8OutputFolder.empty() && u8OutputFolder.back() != '/')
+        u8OutputFolder += '/';
 
-                case OPT_FORMAT:
-                    strFormat = args.OptionArg();
-                    if (strFormat != "tga")
-                        strFormat = "png";
-                    break;
-
-                case OPT_MIP_LEVEL:
-                    mipLevel = atoi(args.OptionArg());
-                    break;
-            }
-        }
-        else
-        {
-            fmt::println("Invalid argument: `{}`", args.OptionText());
-            return -1;
-        }
-    }
-
-    if (args.FileCount() == 0)
-    {
-        puts("No BLP file specified\n");
-        return -1;
-    }
-
+    unsigned int nbImagesConverted = 0;
 
     // Initialise FreeImage
     FreeImage_Initialise(true);
 
-
     // Process the files
-    for (unsigned int i = 0; i < args.FileCount(); ++i)
+    for (auto &u8InFileName : filenames)
     {
-        ++nbImagesTotal;
-
-        string u8InFileName = args.File(i);
         string u8OutFileName = u8InFileName.substr(0, u8InFileName.size() - 3) + strFormat;
 
         size_t offset = u8OutFileName.find_last_of("/\\");
@@ -208,7 +129,7 @@ int main(int argc, char** argv)
 
             if (bInfos)
             {
-                showInfos(args.File(i), header);
+                showInfos(u8OutFileName, header);
             }
             else
             {
