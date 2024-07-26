@@ -42,6 +42,7 @@ Positionals:
 Options:
   -h,--help                   Print this help message and exit
   -i,--infos                  Display informations about the BLP file(s) (no conversion)
+  --rm                        Remove the original BLP file after conversion
   -o,--dest TEXT [./]         Folder where the converted image(s) must be written to
   -f,--format TEXT [png]      `png` or `tga`
   -m,--miplevel UINT [0]      The specific mip level to convert

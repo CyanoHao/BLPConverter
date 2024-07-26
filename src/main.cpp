@@ -57,6 +57,7 @@ void showInfos(const path &inPath, const Header &header)
 namespace options
 {
 bool bInfos = false;
+bool removeBlp = false;
 string strFormat = "png";
 uint32_t mipLevel = 0;
 uint32_t jobs = std::thread::hardware_concurrency();
@@ -115,6 +116,8 @@ void convert(const path &inPath, const path &outPath)
             {
                 fmt::println(stderr, "{}: OK", inPath.u8string());
                 ++nbImagesConverted;
+                if (removeBlp)
+                    fs::remove(inPath);
             }
             else
             {
@@ -141,6 +144,7 @@ int main(int argc, char **argv)
 
     app.add_flag(
         "-i,--infos", bInfos, "Display informations about the BLP file(s) (no conversion)");
+    app.add_flag("--rm", removeBlp, "Remove the original BLP file after conversion");
     app.add_option(
            "-o,--dest", u8OutputDirName, "Folder where the converted image(s) must be written to")
         ->capture_default_str();
