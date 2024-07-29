@@ -48,11 +48,6 @@ Options:
   -j,--jobs UINT [...]        Number of parallel jobs
 ```
 
-## Extras
-
-The Python script 'extra/convert_all.py' can be used to convert recursively in-place
-all the BLP files in a hierarchy of folders.
-
 ## Dependencies
 
 Dependencies are [managed by xmake](./xmake.lua). `xmake build` will automatically download and install the dependencies.

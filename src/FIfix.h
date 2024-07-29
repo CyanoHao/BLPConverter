@@ -35,5 +35,6 @@ void DeInitialise();
 uint8_t *GetScanLine(FIBITMAP *dib, int scanline);
 
 bool Save(Format fif, FIBITMAP *dib, const char *filename, int flags = 0);
+bool Save(Format format, FIBITMAP *dib, const wchar_t *filename, int flags = 0);
 
 } // namespace freeimage

@@ -28,7 +28,8 @@ uint8_t *GetScanLine(FIBITMAP *dib, int scanline)
     return FreeImage_GetScanLine(dib, scanline);
 }
 
-bool Save(Format format, FIBITMAP *dib, const char *filename, int flags)
+template <typename Char>
+bool SaveImpl(Format format, FIBITMAP *dib, const Char *filename, int flags)
 {
     FREE_IMAGE_FORMAT fif = FIF_PNG;
     switch (format)
@@ -40,7 +41,20 @@ bool Save(Format format, FIBITMAP *dib, const char *filename, int flags)
         fif = FIF_TARGA;
         break;
     }
-    return FreeImage_Save(fif, dib, filename, flags);
+    if constexpr (std::is_same_v<Char, wchar_t>)
+        return FreeImage_SaveU(fif, dib, filename, flags);
+    else
+        return FreeImage_Save(fif, dib, filename, flags);
+}
+
+bool Save(Format format, FIBITMAP *dib, const char *filename, int flags)
+{
+    return SaveImpl(format, dib, filename, flags);
+}
+
+bool Save(Format format, FIBITMAP *dib, const wchar_t *filename, int flags)
+{
+    return SaveImpl(format, dib, filename, flags);
 }
 
 } // namespace freeimage
